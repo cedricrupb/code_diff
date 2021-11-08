@@ -17,13 +17,15 @@ class ASTNode(object):
 
         # Tree based attributes
         self.subtree_hash      = None
-        self.subtree_height    = 0
+        self.subtree_height    = 1
         self.subtree_weight    = 1
 
     def isomorph(self, other):
         return ((self.subtree_hash, self.type, self.subtree_height, self.subtree_weight) == 
                     (other.subtree_hash, other.type, other.subtree_height, other.subtree_weight))
 
+    def descandents(self):
+        return (t for t in self if t != self) 
 
     def sexp(self):
         name = self.text if self.text is not None else self.type
@@ -39,6 +41,16 @@ class ASTNode(object):
 
         return "%s {\n%s\n}" % (name, " ".join(child_sexp))
         
+    def __iter__(self):
+        def _self_bfs_search():
+            queue = [self]
+            while len(queue) > 0:
+                current = queue.pop(0)
+                yield current
+                queue.extend(current.children)
+
+        return _self_bfs_search()
+
     def __repr__(self):
         attrs = {"type": self.type, "text": self.text}
         return "ASTNode(%s)" % (", ".join(["%s=%s" % (k, v) for k, v in attrs.items() if v is not None]))
@@ -48,7 +60,7 @@ def default_create_node(type, children, text = None):
     new_node = ASTNode(type, text = text, children = children)
 
     # Subtree metrics
-    height = 0
+    height = 1
     weight = 1
     hash_str = []
 

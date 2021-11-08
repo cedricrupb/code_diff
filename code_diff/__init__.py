@@ -1,9 +1,10 @@
 from code_tokenize.config import load_from_lang_config
 from code_tokenize.tokens import match_type
 
-from .ast    import parse_ast
-from .utils  import cached_property
-from .sstubs import SStubPattern, classify_sstub
+from .ast     import parse_ast
+from .utils   import cached_property
+from .sstubs  import SStubPattern, classify_sstub
+from .gumtree import compute_edit_script
 
 
 # Main method --------------------------------------------------------
@@ -84,13 +85,13 @@ class ASTDiff:
         return classify_sstub(*diff_search(self.source_ast, self.target_ast))
 
     def edit_script(self):
-        pass
+        return compute_edit_script(self.source_ast, self.target_ast)
 
     def __repr__(self):
         return "%s -> %s" % (self.source_text, self.target_text)
 
     
-
+    
 
 # AST Utils -----------------------------------------------------------
 
