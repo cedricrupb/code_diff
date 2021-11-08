@@ -33,7 +33,8 @@ def compute_chawathe_edit_script(editmap, source, target):
             op = Insert(
                     parent_partner.delegate,
                     (target_node.type, target_node.text),
-                    k
+                    k,
+                    -1
                 )
             edit_script.append(op)
             node = parent_partner.apply(op)
@@ -150,9 +151,14 @@ def _align_children(source, target, wt):
 
 class InsertNode:
 
+    INSERT_COUNT = 0
+
     def __init__(self, type, text = None, children = None):
         self.type = type
         self.text = text
+
+        self.node_id = InsertNode.INSERT_COUNT
+        InsertNode.INSERT_COUNT += 1
 
         self.parent = None 
         self.children = children if children is not None else []
@@ -226,6 +232,7 @@ class WorkingNode:
         
         if isinstance(operation, Insert):
             node = InsertNode(*operation.node)
+            operation.insert_id = node.node_id
             wn   = self.src._access_wn(node)
             self.children.insert(operation.position, wn)
 
