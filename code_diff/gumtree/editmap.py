@@ -2,7 +2,7 @@ from apted import APTED, Config
 
 from .utils import subtree_dice, postorder_traversal
 
-# Minimal edit mapping to make source isomorph to target --------------------------------
+# Minimal edit mapping to make source isomorph to target -------------------
 
 # We compute a mapping between source and target tree
 # If a source node is mapped to a target node with different label,
@@ -13,6 +13,36 @@ from .utils import subtree_dice, postorder_traversal
 #   the target node has to be added to the source tree
 #
 # Edits are chosen to be (approximately) minimal
+
+# API method -------------------------------------------------------------
+
+def gumtree_editmap(isomap, source, target, max_size = 1000, min_dice = 0.5):
+    # Caution: This method does change the isomap
+    if len(isomap) == 0: return isomap
+
+    for source_node in postorder_traversal(source):
+
+        if source_node == source: # source_node is root
+            isomap.add(source_node, target)
+
+            for s, t in _minimal_edit(isomap, source_node, target, max_size):
+                isomap.add(s, t)
+
+            break
+
+        if len(source_node.children) == 0: continue # source_node is leaf
+        if (source_node, None) in isomap: continue  # source_node is now mapped
+
+        target_node, dice = _select_near_candidate(source_node, isomap)
+
+        if target_node is None or dice <= min_dice: continue 
+        
+        for s, t in _minimal_edit(isomap, source_node, target_node, max_size):
+            isomap.add(s, t)
+        isomap.add(source_node, target_node)
+
+    return isomap
+
 
 
 # APTED for computing a minimal edit --------------------------------
@@ -77,33 +107,3 @@ def _select_near_candidate(source_node, mapping):
     candidates = [(x, subtree_dice(source_node, x, mapping)) for x in candidates]
 
     return max(candidates, key=lambda x: x[1])
-
-
-# Gumtree Edit Mapping ---------------------------------------------------
-
-def gumtree_editmap(isomap, source, target, max_size = 1000, min_dice = 0.5):
-    # Caution: This method does change the isomap
-    if len(isomap) == 0: return isomap
-
-    for source_node in postorder_traversal(source):
-
-        if source_node == source: # source_node is root
-            isomap.add(source_node, target)
-
-            for s, t in _minimal_edit(isomap, source_node, target, max_size):
-                isomap.add(s, t)
-
-            break
-
-        if len(source_node.children) == 0: continue # source_node is leaf
-        if (source_node, None) in isomap: continue  # source_node is now mapped
-
-        target_node, dice = _select_near_candidate(source_node, isomap)
-
-        if target_node is None or dice <= min_dice: continue 
-        
-        for s, t in _minimal_edit(isomap, source_node, target_node, max_size):
-            isomap.add(s, t)
-        isomap.add(source_node, target_node)
-
-    return isomap

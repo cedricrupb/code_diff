@@ -85,13 +85,27 @@ class ASTDiff:
         return classify_sstub(*diff_search(self.source_ast, self.target_ast))
 
     def edit_script(self):
-        return compute_edit_script(self.source_ast, self.target_ast)
+
+        source_ast, target_ast = self.source_ast, self.target_ast
+
+        def is_statement_type(node_type):
+            return any(match_type(r, node_type) for r in self.config.statement_types)
+
+        if not is_statement_type(source_ast.type) or not is_statement_type(target_ast.type):
+            # We need something where we can add to (root)
+            if source_ast.parent is not None:
+                source_ast = source_ast.parent
+            
+            if target_ast.parent is not None:
+                target_ast = target_ast.parent
+
+        return compute_edit_script(source_ast, target_ast)
 
     def __repr__(self):
         return "%s -> %s" % (self.source_text, self.target_text)
 
     
-    
+
 
 # AST Utils -----------------------------------------------------------
 

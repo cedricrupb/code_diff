@@ -1,20 +1,24 @@
+from dataclasses import dataclass
+from typing import Any, Tuple
 
+@dataclass
+class EditOperation:
+    target_node: Any
 
-class ASTOperation:
-    pass
+@dataclass
+class Update(EditOperation):
+    value: Any
 
+@dataclass
+class Insert(EditOperation):
+    node: Tuple[str, Any]
+    position: int
 
-class UpdateOperation(ASTOperation):
-    pass
+@dataclass
+class Move(EditOperation):
+    node: Any
+    position: int
 
-
-class InsertOperation(ASTOperation):
-    pass
-
-
-class DeleteOperation(ASTOperation):
-    pass
-
-
-class MoveOperation(ASTOperation):
+@dataclass
+class Delete(EditOperation):
     pass

@@ -7,13 +7,14 @@ from collections import defaultdict
 
 class ASTNode(object):
 
-    def __init__(self, type, text = None, parent = None, children = None):
+    def __init__(self, type, text = None, position = None, parent = None, children = None):
 
         # Basic node attributes
         self.type = type
         self.children = children if children is not None else []
         self.parent   = parent
         self.text     = text   # If text is not None, then leaf node
+        self.position = position
 
         # Tree based attributes
         self.subtree_hash      = None
@@ -56,8 +57,8 @@ class ASTNode(object):
         return "ASTNode(%s)" % (", ".join(["%s=%s" % (k, v) for k, v in attrs.items() if v is not None]))
 
 
-def default_create_node(type, children, text = None):
-    new_node = ASTNode(type, text = text, children = children)
+def default_create_node(type, children, text = None, position = None):
+    new_node = ASTNode(type, text = text, position = position, children = children)
 
     # Subtree metrics
     height = 1
@@ -101,7 +102,8 @@ class TokensToAST:
         children = [self.node_index[_node_key(c)] for c in ast_node.children
                      if _node_key(c) in self.node_index]
 
-        current_node = self.create_node_fn(ast_node.type, children, text = text)
+        position = (ast_node.start_point, ast_node.end_point)
+        current_node = self.create_node_fn(ast_node.type, children, text = text, position = position)
         self.node_index[node_key] = current_node
 
         # Add parent if ready
