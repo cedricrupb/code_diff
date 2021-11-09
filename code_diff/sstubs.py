@@ -300,7 +300,9 @@ def change_iterable(source_ast, target_ast):
 
 def add_function_around_expression(source_ast, target_ast):
     argument_list = target_ast.children[-1]
-    assert argument_list.type == "argument_list", str(argument_list)
+    
+    if argument_list.type == "argument_list":
+        return False
 
     if len(argument_list.children) != 3: return False
 

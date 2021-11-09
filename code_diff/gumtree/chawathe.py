@@ -260,7 +260,7 @@ class WorkingNode:
             self.apply(Delete(insert_node))
 
             wn   = self.src._access_wn(insert_node)
-            self.mod_children.insert(operation.position, wn)
+            self.children.insert(operation.position, wn)
 
             wn.mod_parent = self
 
