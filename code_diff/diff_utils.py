@@ -86,3 +86,55 @@ def parse_hunks(diff):
                 
     return hunks
 
+
+# Diff cleaning --------------------------------
+
+def _has_incomplete_comment(lines):
+    is_incomplete2 = False
+    is_incomplete1 = False
+
+    for line in lines:
+        count2 = line.count("\"\"\"")
+        if count2 % 2 == 1: is_incomplete2 = not is_incomplete2
+        
+        count1 = line.count("\'\'\'")
+        if count1 % 2 == 1: is_incomplete1 = not is_incomplete1
+
+    return is_incomplete1 or is_incomplete2
+
+
+def _determine_incomplete_comment(lines):
+    last_incomplete2 = -1
+    last_incomplete1 = -1
+
+    for i, line in enumerate(lines):
+        count2 = line.count("\"\"\"")
+        if count2 % 2 == 1:
+            last_incomplete2 = i if last_incomplete2 == -1 else -1
+        
+        count1 = line.count("\'\'\'")
+        if count1 % 2 == 1:
+            last_incomplete1 = i if last_incomplete1 == -1 else -1
+
+    assert last_incomplete1 != -1 or last_incomplete2 != -1
+
+    last_incomplete = last_incomplete2 if last_incomplete2 != -1 else last_incomplete1
+
+    dist_to_end = len(lines) - last_incomplete
+
+    if last_incomplete < dist_to_end:
+        return last_incomplete + 1, len(lines)
+    else:
+        return 0, last_incomplete
+
+
+def clean_hunk(hunk):
+    if not _has_incomplete_comment(hunk.lines): return hunk
+    start, end = _determine_incomplete_comment(hunk.lines)
+
+    new_lines = hunk.lines[start:end]
+    added_lines = [l - start for l in hunk.added_lines if l >= start and l < end]
+    rm_lines    = [l - start for l in hunk.rm_lines if l >= start and l < end]
+
+    return Hunk(new_lines, added_lines, rm_lines)
+

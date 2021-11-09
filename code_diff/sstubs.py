@@ -38,8 +38,8 @@ class SStubPattern(Enum):
     ADD_ATTRIBUTE_ACCESS           = 21 
 
     # If condition
-    MORE_SPECIFIC_IF               = 21
-    LESS_SPECIFIC_IF               = 22
+    MORE_SPECIFIC_IF               = 22
+    LESS_SPECIFIC_IF               = 23
 
 
 # SStub classification -------------------------------
@@ -143,7 +143,7 @@ def _to_plain_constant(text):
 
 
 def change_constant_type(source_ast, target_ast):
-    
+
     if source_ast.type == "identifier": return False
     if target_ast.type == "identifier": return False
 

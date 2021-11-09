@@ -164,6 +164,100 @@ class TokensToAST:
         
         return self.root_node
 
+
+
+class BottomUpParser:
+
+    def __init__(self, create_node_fn):
+        
+        self.create_node_fn = create_node_fn
+        self.waitlist    = [] # Invariant: All children have been processed
+        self.open_index  = {} 
+        self.node_index  = {} # Nodes that have been processed
+
+    def _should_ignore(self, node):
+        return node.type == "comment"
+
+    def _add_to_waitlist(self, node):
+        if self._should_ignore(node): return
+
+        node_key = _node_key(node)
+
+        if node_key not in self.node_index and node_key not in self.open_index:
+            self.open_index[node_key] = node
+            self.waitlist.append(node)
+
+
+    def _init_lists(self, tokens):
+        
+        for token in tokens:
+            if hasattr(token, 'ast_node'):
+                ast_node = token.ast_node
+                if self._should_ignore(ast_node): continue
+                self.open_index[_node_key(ast_node)] = ast_node
+                self._create_node(ast_node, token.text)
+
+        if ast_node is None: return
+
+        # Get to root
+        root = ast_node
+        while root.parent is not None:
+            root = root.parent
+
+        self._open_descandents(root)
+
+        return root
+
+    def _open_descandents(self, node):
+
+        queue = [node]
+        while len(queue) > 0:
+            current_node = queue.pop(0)
+
+            has_opened = False
+            for child in current_node.children:
+                if _node_key(child) not in self.node_index:
+                    has_opened = True
+                    queue.append(child)
+            
+            if not has_opened: 
+                self._add_to_waitlist(current_node)
+
+
+    def _open_parent(self, ast_node):
+        parent = ast_node.parent
+
+        if all(_node_key(c) in self.node_index for c in parent.children if not self._should_ignore(c)):
+            self._add_to_waitlist(parent)
+
+    def _create_node(self, ast_node, text = None):
+
+        node_key = _node_key(ast_node)
+        children = [self.node_index[_node_key(c)] for c in ast_node.children
+                     if _node_key(c) in self.node_index]
+
+        position = (ast_node.start_point, ast_node.end_point)
+        current_node = self.create_node_fn(ast_node.type, children, text = text, position = position)
+        current_node.backend = ast_node
+
+        self.node_index[node_key] = current_node
+        del self.open_index[node_key]
+        
+        if ast_node.parent: self._open_parent(ast_node)
+
+
+    def __call__(self, tokens):
+        root_node = self._init_lists(tokens)
+
+        while len(self.waitlist) > 0:
+            self._create_node(self.waitlist.pop(0))
+        
+        if _node_key(root_node) not in self.node_index:
+            return None
+
+        return self.node_index[_node_key(root_node)]
+
+
     
 
 # Interface ----------------------------------------------------------------
@@ -177,4 +271,4 @@ def parse_ast(source_code, lang = "guess", **kwargs):
 
     ast_tokens = ct.tokenize(source_code, **kwargs)
     
-    return TokensToAST(default_create_node)(ast_tokens)
+    return BottomUpParser(default_create_node)(ast_tokens)

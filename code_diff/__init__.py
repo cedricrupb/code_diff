@@ -15,6 +15,9 @@ def difference(source, target, lang = "guess", **kwargs):
     source_ast = parse_ast(source, lang = lang, **kwargs)
     target_ast = parse_ast(target, lang = lang, **kwargs)
 
+    if source_ast is None or target_ast is None:
+        raise ValueError("Source / Target AST seems to be empty: %s" % source)
+
     # Concretize Diff
     source_ast, target_ast = diff_search(source_ast, target_ast)
 
