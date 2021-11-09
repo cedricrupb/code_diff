@@ -100,11 +100,11 @@ class JsonlGzSaver:
         need_update = self.file_handler is None or self.object_count >= self.num_objects
         if not need_update: return
 
-        file_path = os.path.join(self.save_dir, "file-%d.jsonl" % self.file_count)
+        file_path = os.path.join(self.save_dir, "file-%d.jsonl.gz" % self.file_count)
 
         if self.file_handler is not None: self.file_handler.close()
 
-        self.file_handler = open(file_path, "wb")
+        self.file_handler = gzip.open(file_path, "wb")
         self.file_count += 1
         self.object_count = 0
 
