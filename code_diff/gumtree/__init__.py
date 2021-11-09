@@ -38,4 +38,4 @@ class EditScript(list):
         super().__init__(operations)
 
     def __repr__(self):
-        return serialize_script(self)
+        return serialize_script(self, indent = 2)

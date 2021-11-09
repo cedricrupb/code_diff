@@ -98,12 +98,17 @@ class TokensToAST:
         self.child_count = defaultdict(int)
 
     def _create_node(self, ast_node, text = None):
+
+        if ast_node.type == "comment": return # We ignore comments
+
         node_key = _node_key(ast_node)
         children = [self.node_index[_node_key(c)] for c in ast_node.children
                      if _node_key(c) in self.node_index]
 
         position = (ast_node.start_point, ast_node.end_point)
         current_node = self.create_node_fn(ast_node.type, children, text = text, position = position)
+        current_node.backend = ast_node
+
         self.node_index[node_key] = current_node
 
         # Add parent if ready
@@ -119,20 +124,50 @@ class TokensToAST:
             self.root_node = current_node
 
 
+    def _open_node(self, node):
+        node_key = _node_key(node)
+        if node_key in self.node_index: return False
+
+        opened = False
+        for c in node.children:
+            opened = opened or self._open_node(c)
+        
+        if not opened:
+            self.waitlist.append(node)
+            return True
+        
+        return False
+
+    def _open_root_if_not_complete(self, base_node):
+        
+        root = base_node
+        while root.parent is not None:
+            root = root.parent
+        
+        for c in root.children:
+            self._open_node(c)
+
     def __call__(self, tokens):
         
         token_nodes = ((t.text, t.ast_node) for t in tokens if hasattr(t, "ast_node"))
         for token_text, token_ast in token_nodes:
             self._create_node(token_ast, text = token_text)
 
-        while len(self.waitlist) > 0:
-            self._create_node(self.waitlist.pop(0))
-    
+        while self.root_node is None:
+            while len(self.waitlist) > 0:
+                current_node = self.waitlist.pop(0)
+                self._create_node(current_node)
+
+            self._open_root_if_not_complete(current_node)
+
+        print(self.root_node.sexp())
+        
         return self.root_node
 
     
 
 # Interface ----------------------------------------------------------------
+
 
 def parse_ast(source_code, lang = "guess", **kwargs):
     

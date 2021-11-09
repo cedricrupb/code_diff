@@ -54,7 +54,7 @@ def _serialize_node(new_node_index, node):
     return _serialize_ast_node(node)
 
 
-def serialize_script(edit_script):
+def serialize_script(edit_script, indent = 0):
     
     sedit_script = []
     new_node_index = {}
@@ -77,15 +77,19 @@ def serialize_script(edit_script):
             else: # Leaf node
                 new_node_str = "%s:%s" % new_node
 
-            sedit_script.append("%s(%s, %s, %d)" % (operation_name, target_node_str, new_node_str, operation.position))
+            sedit_script.append("%s(%s, %s, %d)" % (operation_name, new_node_str, target_node_str, operation.position))
 
         elif operation_name == "Move":
 
             new_node_str = _serialize_node(new_node_index, operation.node)
 
-            sedit_script.append("%s(%s, %s, %d)" % (operation_name, target_node_str, new_node_str, operation.position))
+            sedit_script.append("%s(%s, %s, %d)" % (operation_name, new_node_str, target_node_str, operation.position))
 
         elif operation_name == "Delete":
             sedit_script.append("%s(%s)" % (operation_name, target_node_str))
 
-    return json.dumps(sedit_script, indent=2)
+    if indent > 0:
+        sedit_script = [" "*indent + e for e in sedit_script]
+        return "[\n%s\n]" % (",\n").join(sedit_script)
+
+    return "[%s]" % ", ".join(sedit_script)

@@ -18,6 +18,9 @@ def difference(source, target, lang = "guess", **kwargs):
     # Concretize Diff
     source_ast, target_ast = diff_search(source_ast, target_ast)
 
+    if source_ast is None:
+        raise ValueError("Source and Target AST are identical.")
+
     return ASTDiff(config, source_ast, target_ast)
 
 
@@ -79,6 +82,10 @@ class ASTDiff:
         return ASTDiff(self.config, source_stmt, target_stmt)
 
     def sstub_pattern(self):
+        if (parent_statement(self.config.statement_types, self.source_ast) is None
+                or parent_statement(self.config.statement_types, self.target_ast) is None):
+            return SStubPattern.NO_STMT                
+
         if not self.is_single_statement:
             return SStubPattern.MULTI_STMT
         
