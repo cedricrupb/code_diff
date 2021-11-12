@@ -47,15 +47,22 @@ class SStubPattern(Enum):
 def classify_sstub(source_ast, target_ast):
     # Assume tree is minimized to smallest edit
 
+    print(source_ast.sexp())
+    print(target_ast.sexp())
+
     if len(source_ast.children) == 0 and len(target_ast.children) == 0:
         return single_token_edit(source_ast, target_ast)
 
     if source_ast.parent.type == "call" and target_ast.parent.type == "call":
-        source_name = source_ast.parent.children[0]
-        target_name = target_ast.parent.children[0]
+        source_name = _call_name(source_ast.parent)
+        target_name = _call_name(target_ast.parent)
 
-        if source_name.text == target_name.text:
+        if source_name == target_name:
             return same_function_mod(source_ast, target_ast)
+
+    if "operator" in source_ast.type or "operator" in target_ast.type:
+        if is_unary_operator_change(source_ast, target_ast):
+            return SStubPattern.CHANGE_UNARY_OPERATOR
 
     if _query_path(source_ast, "if_statement", "condition"):
         return change_if_statement(source_ast, target_ast)
@@ -63,14 +70,55 @@ def classify_sstub(source_ast, target_ast):
     if source_ast.type in ["tuple", "list", "dictionary", "set"]:
         return change_iterable(source_ast, target_ast)
 
-    if target_ast.type == "call":
+    if target_ast.type == "call" or target_ast.parent.type == "call":
         return add_function(source_ast, target_ast)
 
     if target_ast.type == "attribute":
         return add_attribute_access(source_ast, target_ast)
 
+    if is_binary_operand(source_ast, target_ast):
+        return SStubPattern.CHANGE_BINARY_OPERAND
+
     return SStubPattern.SINGLE_STMT
+
+
+# Utils -------------------------------------------------------------------------
+
+def _call_name(ast_node):
+    function_node = ast_node.children[0]
+
+    right_most = function_node
+    while len(right_most.children) > 0:
+        right_most = right_most.children[-1]
     
+    return right_most.text
+
+
+
+def pisomorph(A, B):
+    if A.isomorph(B): return True
+
+    if A.type == "parenthesized_expression":
+        return pisomorph(A.children[1], B)
+    
+    if B.type == "parenthesized_expression":
+        return pisomorph(A, B.children[1])
+    
+    return False
+
+    
+
+# Binary operand ----------------------------------------------------------------
+
+def _is_binary_operand(source_ast, target_ast):
+    return _query_path(source_ast, "binary_operator", "left") or _query_path(source_ast, "binary_operator", "right")
+
+def is_boolean_operand(source_ast, target_ast):
+    return _query_path(source_ast, "boolean_operator", "left") or _query_path(source_ast, "boolean_operator", "right")
+
+
+def is_binary_operand(source_ast, target_ast):
+    return _is_binary_operand(source_ast, target_ast) or is_boolean_operand(source_ast, target_ast)
 
 
 
@@ -86,7 +134,7 @@ def _query_path(ast_node, type_query, edge_query = "*", depth = 1e9):
             
             if edge_query == "*":
                 return True
-            else:
+            elif last is not None:
                 if hasattr(current, "backend"):
                     edge_child = current.backend.child_by_field_name(edge_query)
                     return edge_child == last.backend
@@ -99,8 +147,47 @@ def _query_path(ast_node, type_query, edge_query = "*", depth = 1e9):
     return False
 
 
+
+def _get_parent(ast_node, type_query, edge_query = "*", depth = 1e9):
+
+    last    = None
+    current = ast_node
+    while current is not None:
+
+        if current.type == type_query:
+            
+            if edge_query == "*":
+                return current
+            elif last is not None:
+                if hasattr(current, "backend"):
+                    edge_child = current.backend.child_by_field_name(edge_query)
+                    if edge_child == last.backend:
+                        return current
+
+        last    = current
+        current = current.parent
+        depth  -= 1
+        if depth < 0: break
+    
+    return None
+
+
+
 def wrong_function_name(source_ast, target_ast):
-    return _query_path(source_ast, "call", "function")
+    if not source_ast.type == "identifier": return False
+    if not target_ast.type == "identifier": return False
+
+    func_call = _get_parent(source_ast, "call", "function")
+    if func_call is None: return False
+    
+    right_most = func_call.backend.child_by_field_name("function")
+    while right_most is not None and right_most != source_ast.backend:
+        if len(right_most.children) > 0:
+            right_most = right_most.children[-1]
+        else:
+            right_most = None
+
+    return right_most is not None
 
 
 def change_numeric_literal(source_ast, target_ast):
@@ -122,9 +209,13 @@ def change_identifier_used(source_ast, target_ast):
 
 
 def change_binary_operator(source_ast, target_ast):
-    if _query_path(source_ast, "binary_operator", "*", depth = 1):
-        return (not _query_path(source_ast, "binary_operator", "left", depth = 1) 
-                    and not _query_path(source_ast, "binary_operator", "right", depth = 1))
+
+    for operator in ["binary_operator", "boolean_operator", "comparison_operator"]:
+        if _query_path(source_ast, operator, "*", depth = 1):
+            if (not _query_path(source_ast, operator, "left", depth = 1) 
+                    and not _query_path(source_ast, operator, "right", depth = 1)):
+                return True
+
     return False
 
 
@@ -178,8 +269,9 @@ single_token_edits = {
     SStubPattern.CHANGE_ATTRIBUTE_USED: change_attribute_used,
     SStubPattern.CHANGE_KEYWORD_ARGUMENT_USED : change_keyword_argument_used,
     SStubPattern.SAME_FUNCTION_WRONG_CALLER: same_function_wrong_caller,
-    SStubPattern.CHANGE_IDENTIFIER_USED: change_identifier_used,
     SStubPattern.CHANGE_BINARY_OPERATOR: change_binary_operator,
+    SStubPattern.CHANGE_BINARY_OPERAND:  is_binary_operand,
+    SStubPattern.CHANGE_IDENTIFIER_USED: change_identifier_used,
 }
 
 
@@ -202,7 +294,7 @@ def same_function_more_args(source_ast, target_ast):
 
     arguments = source_ast.children
     for arg in arguments:
-        if not any(t.isomorph(arg) for t in target_ast.children):
+        if not any(pisomorph(t, arg) for t in target_ast.children):
             return False
         
     return True
@@ -215,7 +307,7 @@ def same_function_less_args(source_ast, target_ast):
 
     arguments = target_ast.children
     for arg in arguments:
-        if not any(t.isomorph(arg) for t in source_ast.children):
+        if not any(pisomorph(t, arg) for t in source_ast.children):
             return False
         
     return True
@@ -228,7 +320,7 @@ def same_function_swap_args(source_ast, target_ast):
 
     arguments = source_ast.children
     for arg in arguments:
-        if not any(t.isomorph(arg) for t in target_ast.children):
+        if not any(pisomorph(t, arg) for t in target_ast.children):
             return False
 
     return True
@@ -253,15 +345,16 @@ def same_function_mod(source_ast, target_ast):
     return SStubPattern.SINGLE_STMT
 
 
+
 # If statement ----------------------------------------------------------------
 
 
 def more_specific_if(source_ast, target_ast):
-    return any(c.isomorph(source_ast) for c in target_ast.children)
+    return any(pisomorph(c, source_ast) for c in target_ast.children)
 
 
 def less_specific_if(source_ast, target_ast):
-    return any(c.isomorph(target_ast) for c in source_ast.children)
+    return any(pisomorph(c, target_ast) for c in source_ast.children)
 
 
 def change_if_statement(source_ast, target_ast):
@@ -271,6 +364,9 @@ def change_if_statement(source_ast, target_ast):
 
     if less_specific_if(source_ast, target_ast):
         return SStubPattern.LESS_SPECIFIC_IF
+
+    if is_binary_operand(source_ast, target_ast):
+        return SStubPattern.CHANGE_BINARY_OPERAND
 
     return SStubPattern.SINGLE_STMT
 
@@ -282,7 +378,7 @@ def add_elements_to_iterable(source_ast, target_ast):
         return False
 
     for c in source_ast.children:
-        if not any(t.isomorph(c) for t in target_ast.children):
+        if not any(pisomorph(t, c) for t in target_ast.children):
             return False
         
     return True
@@ -301,13 +397,13 @@ def change_iterable(source_ast, target_ast):
 def add_function_around_expression(source_ast, target_ast):
     argument_list = target_ast.children[-1]
     
-    if argument_list.type == "argument_list":
+    if argument_list.type != "argument_list":
         return False
 
     if len(argument_list.children) != 3: return False
 
     for arg in argument_list.children:
-        if arg.isomorph(source_ast):
+        if pisomorph(arg, source_ast):
             return True
 
     return False
@@ -330,17 +426,36 @@ def add_method_call(source_ast, target_ast):
     
     attribute = target_ast.children[0]
 
-    if attribute.type != "attribute": return False
+    if attribute.type not in ["attribute", "call"]: return False
 
-    return attribute.children[0].isomorph(source_ast)
+    return pisomorph(attribute.children[0], source_ast)
 
 # ADD attribute -------------------------------------------------------------
 
 
 def add_attribute_access(source_ast, target_ast):
-    if target_ast.children[0].isomorph(source_ast):
+    if pisomorph(target_ast.children[0], source_ast):
         return SStubPattern.ADD_ATTRIBUTE_ACCESS
     
     return SStubPattern.SINGLE_STMT
 
+
+# Change unary operator ----------------------------------------------------
+
+def is_unary_operator(node):
+    if "operator" not in node.type: return False
+    return len(node.children) == 2
+
+
+def is_unary_operator_change(source_ast, target_ast):
+
+    if is_unary_operator(source_ast):
+        for source_child in source_ast.children:
+            if pisomorph(source_child, target_ast): return True
+    
+    if is_unary_operator(target_ast):
+        for target_child in target_ast.children:
+            if pisomorph(target_child, source_ast): return True
+
+    return False
     

@@ -2,7 +2,7 @@ from .isomap   import gumtree_isomap
 from .editmap  import gumtree_editmap
 from .chawathe import compute_chawathe_edit_script
 from .ops      import (Update, Insert, Delete, Move)
-from .ops      import serialize_script
+from .ops      import serialize_script, deserialize_script
 
 # Edit script ----------------------------------------------------------------
 
