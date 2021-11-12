@@ -1,6 +1,7 @@
 
 import heapq
 import itertools
+import math
 
 from collections import defaultdict
 
@@ -137,10 +138,25 @@ def _map_recursively(mapping, source_node, target_node):
 # Heuristic selection ----------------------------------------------------------------
 
 
+def source_distance(source_node, target_node):
+   
+    max_token_mover = 1000
+
+    line_mover_distance = source_node.position[0][0] - target_node.position[1][0]
+    line_mover_distance = line_mover_distance * max_token_mover
+
+    if line_mover_distance == 0:
+        token_mover_distance = min(abs(source_node.position[0][1] - target_node.position[0][1]), max_token_mover - 1) 
+        line_mover_distance += token_mover_distance
+
+    return -line_mover_distance
+
+
+
 def create_default_heuristic(isomorphic_mapping):
 
     def _heuristic(source_node, target_node):
-        return subtree_dice(source_node, target_node, isomorphic_mapping)
+        return (subtree_dice(source_node, target_node, isomorphic_mapping), source_distance(source_node, target_node))
     
     return _heuristic
 

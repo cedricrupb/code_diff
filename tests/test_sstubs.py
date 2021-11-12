@@ -1461,3 +1461,56 @@ def test_less_specific_if_5():
     """
     
     assert compute_diff_sstub(test) == SStubPattern.LESS_SPECIFIC_IF
+
+
+# Real world tests ----------------------------------------------------------------
+
+def test_real_world_1():
+
+    test = """
+@@ -16,7 +16,7 @@ def test_databases():
+     bench2 = Benchmark(statement, setup, name='list with xrange',
+         description='Xrange', start_date=datetime(2013, 3, 9))
+ 
+-    dbHandler = BenchmarkDb.get_instance('bench.db')
++    dbHandler = BenchmarkDb('bench.db')
+    """
+
+    assert compute_diff_sstub(test) == SStubPattern.SINGLE_STMT
+
+
+
+def test_real_world_2():
+
+    test = """
+@@ -146,7 +146,7 @@ class DatetimeWidget(DateWidget):
+         if default in (year, month, day, hour, minute):
+             return default
+
+-        if self.ampm is True and hour != 12:
++        if self.ampm is True and int(hour)!=12:
+             ampm = self.request.get(self.name + '-ampm', default)
+             if ampm == 'PM':
+                 hour = str(12+int(hour))
+    """
+
+    assert compute_diff_sstub(test) == SStubPattern.ADD_FUNCTION_AROUND_EXPRESSION
+
+
+def test_real_world_3():
+
+    test = """
+@@ -59,7 +59,8 @@ class UrlRewriteFilter(object):
+         if ext in CONTENT_TYPES:
+             # Use the content type specified by the extension
+             return (path, CONTENT_TYPES[ext])
+-        elif http_accept is None:
++        elif http_accept is None or http_accept == '*/*':
++            # TODO: This probably isn't the best place to handle "Accept: */*"
+             # No extension or Accept header specified, use default
+             return (path_info, DEFAULT_CONTENT_TYPE)
+         else:
+    
+    """
+
+    assert compute_diff_sstub(test) == SStubPattern.MORE_SPECIFIC_IF

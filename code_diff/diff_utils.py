@@ -5,10 +5,11 @@ import re
 
 class Hunk:
     
-    def __init__(self, lines, added_lines, rm_lines):
+    def __init__(self, lines, added_lines, rm_lines, header = None):
         self.lines       = lines
         self.added_lines = set(added_lines)
         self.rm_lines    = set(rm_lines)
+        self.header      = header
         
         
     @property
@@ -41,6 +42,10 @@ class Hunk:
         return "".join(alines)
         
     def __repr__(self):
+
+        if self.header:
+            return self.header + "".join(self.lines)
+
         return "".join(self.lines)
 
     
@@ -55,7 +60,7 @@ def _parse_hunk(lines, start, end):
         if hline.startswith("+"): added_lines.append(i)
         if hline.startswith("-"): rm_lines.append(i)
     
-    return Hunk(hunk_lines, added_lines, rm_lines)
+    return Hunk(hunk_lines, added_lines, rm_lines, header = lines[start])
     
 
 hunk_pat = re.compile("@@ -(\d+)(,\d+)? \+(\d+)(,\d+)? @@.*")
@@ -136,5 +141,5 @@ def clean_hunk(hunk):
     added_lines = [l - start for l in hunk.added_lines if l >= start and l < end]
     rm_lines    = [l - start for l in hunk.rm_lines if l >= start and l < end]
 
-    return Hunk(new_lines, added_lines, rm_lines)
+    return Hunk(new_lines, added_lines, rm_lines, header = hunk.header)
 

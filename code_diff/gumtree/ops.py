@@ -25,6 +25,16 @@ class Move(EditOperation):
 class Delete(EditOperation):
     pass
 
+# Edit script ----------------------------------------------------------------
+
+class EditScript(list):
+
+    def __init__(self, operations):
+        super().__init__(operations)
+
+    def __repr__(self):
+        return serialize_script(self, indent = 2)
+
 
 # Serialization --------------------------------
 
@@ -285,11 +295,11 @@ def json_serialize(edit_script):
             else: # Leaf node
                 new_node_str = ["%s:%s" % new_node, "T"]
 
-            edit_ops.append([operation_name, target_node_str, new_node_str])
+            edit_ops.append([operation_name, target_node_str, new_node_str, operation.position])
 
         elif operation_name == "Move":
 
-            new_node_str = _serialize_node(new_node_index, operation.node)
+            new_node_str = _json_serialize_node(new_node_index, operation.node)
 
             edit_ops.append([operation_name, target_node_str, new_node_str, operation.position])
 
@@ -300,3 +310,80 @@ def json_serialize(edit_script):
 
 
 # Fast deserialize ----------------------------------------------------------------------
+
+def _json_deserialize_node(node_index, node_info):
+
+    if not isinstance(node_info, list) and node_info != "T":
+        node_id = int(node_info[1:])
+        return node_index[node_id]
+
+    node_type, position = node_info[0], node_info[1:]
+    node_text = None
+
+    if ":" in node_type:
+        node_type, node_text = node_type.split(":", 1)
+
+    if len(position) == 4:
+        return DASTNode(node_type, ((position[0], position[1]), (position[2], position[3])), node_text)
+
+    return InsertNode(position[0], node_type, node_text)
+
+
+def _json_deserialize_node_constructor(node_index, cn_info):
+    node_type, node_id = cn_info
+    node_text = None
+
+    if ":" in node_type:
+        node_type, node_text = node_type.split(":", 1)
+
+    if node_id != "T":
+        node_id = int(node_id[1:])
+        node_index[node_id] = InsertNode(node_id, node_type, node_text)
+        return node_index[node_id]
+    
+    return InsertNode(node_id, node_type, node_text)
+
+
+def _json_deserialize_update(node_index, operation):
+    _, target, update = operation
+    target = _json_deserialize_node(node_index, target)
+    return Update(target, update)
+
+
+def _json_deserialize_insert(node_index, operation):
+    _, target, new_node, position = operation
+    target = _json_deserialize_node(node_index, target)
+    new_node = _json_deserialize_node_constructor(node_index, new_node)
+
+    return Insert(target, (new_node.type, new_node.text), position, new_node.node_id)
+
+
+def _json_deserialize_delete(node_index, operation):
+    return Delete(_json_deserialize_node(node_index, operation[1]))
+
+
+def _json_deserialize_move(node_index, operation):
+    _, target, move_node, position = operation
+    target = _json_deserialize_node(node_index, target)
+    move_node = _json_deserialize_node(node_index, move_node)
+    return Move(target, move_node, position)
+    
+
+DESERIALIZE = {
+    "Update" : _json_deserialize_update,
+    "Insert" : _json_deserialize_insert,
+    "Delete" : _json_deserialize_delete,
+    "Move"   : _json_deserialize_move
+}
+
+
+def json_deserialize(edit_json):
+    edit_ops = json.loads(edit_json)
+    output   = []
+    node_index = {}
+
+    for operation in edit_ops:
+        operation_name = operation[0]
+        output.append(DESERIALIZE[operation_name](node_index, operation))
+    
+    return EditScript(output)

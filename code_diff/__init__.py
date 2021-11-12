@@ -4,7 +4,7 @@ from code_tokenize.tokens import match_type
 from .ast     import parse_ast
 from .utils   import cached_property
 from .sstubs  import SStubPattern, classify_sstub
-from .gumtree import compute_edit_script
+from .gumtree import compute_edit_script, EditScript, Update
 
 
 # Main method --------------------------------------------------------
@@ -84,7 +84,11 @@ class ASTDiff:
         
         return ASTDiff(self.config, source_stmt, target_stmt)
 
+    def root_diff(self):
+        return ASTDiff(self.config, ast_root(self.source_ast), ast_root(self.target_ast))
+
     def sstub_pattern(self):
+        
         if (parent_statement(self.config.statement_types, self.source_ast) is None
                 or parent_statement(self.config.statement_types, self.target_ast) is None):
             return SStubPattern.NO_STMT                
@@ -98,16 +102,18 @@ class ASTDiff:
 
         source_ast, target_ast = self.source_ast, self.target_ast
 
-        def is_statement_type(node_type):
-            return any(match_type(r, node_type) for r in self.config.statement_types)
+        if source_ast.type == target_ast.type and len(source_ast.children) == 0 and len(target_ast.children) == 0:
+            # Both nodes are tokens of the same type 
+            # Only an update is required
+            return EditScript([Update(source_ast, target_ast.text)])
 
-        if not is_statement_type(source_ast.type) or not is_statement_type(target_ast.type):
-            # We need something where we can add to (root)
-            if source_ast.parent is not None:
-                source_ast = source_ast.parent
-            
-            if target_ast.parent is not None:
-                target_ast = target_ast.parent
+        # We need a common root to add to
+        while source_ast.type != target_ast.type: 
+            if source_ast.parent is None: break
+            if target_ast.parent is None: break
+
+            source_ast = source_ast.parent
+            target_ast = target_ast.parent
 
         return compute_edit_script(source_ast, target_ast)
 
@@ -150,6 +156,15 @@ def parent_statement(statement_types, ast):
     return parent_node
 
 
+def ast_root(ast):
+    parent_node = ast
+
+    while parent_node.parent is not None:
+        parent_node = parent_node.parent
+
+    return parent_node
+
+
 def tokenize_tree(ast):
     tokens = []
 
@@ -160,3 +175,18 @@ def tokenize_tree(ast):
         tokens.append(tokenize_tree(child))
     
     return " ".join(tokens)
+
+
+
+def is_compatible_root(root_candidate, source_ast):
+    return not equal_text(source_ast, root_candidate) and root_candidate.type != "block"
+
+
+def equal_text(source_ast, parent_ast):
+    source_position = source_ast.position
+    parent_position = parent_ast.position
+
+    if parent_position[0][0] < source_position[0][0]: return False
+    if source_position[1][0] < parent_position[1][0]: return False
+
+    return (source_position[0][1], source_position[1][1]) == (parent_position[0][1], parent_position[1][1])

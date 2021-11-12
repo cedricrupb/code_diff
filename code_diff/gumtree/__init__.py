@@ -2,7 +2,9 @@ from .isomap   import gumtree_isomap
 from .editmap  import gumtree_editmap
 from .chawathe import compute_chawathe_edit_script
 from .ops      import (Update, Insert, Delete, Move)
+from .ops      import EditScript
 from .ops      import serialize_script, deserialize_script
+from .ops      import json_serialize, json_deserialize
 
 # Edit script ----------------------------------------------------------------
 
@@ -28,14 +30,3 @@ def compute_edit_script(source_ast, target_ast, min_height = 1, max_size = 1000,
 
 def _update_leaf(source_ast, target_ast):
     return Update(source_ast, target_ast.text)
-
-
-# Edit script ----------------------------------------------------------------
-
-class EditScript(list):
-
-    def __init__(self, operations):
-        super().__init__(operations)
-
-    def __repr__(self):
-        return serialize_script(self, indent = 2)
