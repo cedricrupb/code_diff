@@ -6,6 +6,40 @@ from collections import defaultdict
 
 
 class ASTNode(object):
+    """
+    A representation of an AST node together with its children
+
+    Node Attributes
+    ---------------
+    type : str
+        Syntactic type of the AST node
+
+    text : str
+        If this node belongs to a program token, then
+        it contains the text of the program token. Otherwise, None.
+    
+    children : list[ASTNode]
+        Potenially empty list of child nodes
+    
+    position : int
+        If supported, the code position that is referenced by the AST node
+
+    parent : ASTNode
+        If not root node, the AST parent of this node.
+    
+    Subtree Attributes
+    ------------------
+    subtree_hash : str
+        A hash string representing the subtree of the AST node
+        Two subtrees are isomorph if they have the same subtree hash.
+    
+    subtree_height : int
+        Longest path from this node to a leaf node
+
+    subtree_weight : int
+        Count of all nodes in this subtree
+    
+    """
 
     def __init__(self, type, text = None, position = None, parent = None, children = None):
 
@@ -264,6 +298,30 @@ class BottomUpParser:
 
 
 def parse_ast(source_code, lang = "guess", **kwargs):
+    """
+    Parses a given source code string into its AST
+
+    Function to parse source code in the given language
+    into its AST. As a backend, we employ
+    code_tokenize (tree-sitter). The final
+    AST is additionally analyzed to compute
+    additional annotations
+
+    Parameters
+    ----------
+    source_code : str
+        Source code snippet as a string
+    
+    lang : [python, java, javascript, ...]
+        Language to parse the given source code
+        Default: guess (Currently not supported; will raise error)
+
+    Returns
+    -------
+    ASTNode
+        the root node of the computed AST
+    
+    """
     
     # Parse AST 
     kwargs["lang"] = lang

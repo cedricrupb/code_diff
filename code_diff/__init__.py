@@ -10,6 +10,46 @@ from .gumtree import compute_edit_script, EditScript, Update
 # Main method --------------------------------------------------------
 
 def difference(source, target, lang = "guess", **kwargs):
+    """
+    Computes the smallest difference between source and target
+
+    Computes the smallest code difference between the given 
+    code snippets. Difference is computed by a simulteanous
+    walk over the ASTs of the given code snippets. Returned
+    will be the smallest code snippet that represent
+    the first AST node found to be different.
+
+    Parameters
+    ----------
+    source : str
+        Source code which should be compared
+    
+    target : str
+        Comparison target as a code string
+
+    lang : [python, java, javascript, ...]
+        Programming language which should be used
+        to parse the code snippets.
+        Default: guess (Currently not supported, will throw error)
+    
+    syntax_error : [raise, warn, ignore]
+        Strategy to handle syntax errors in code.
+        To parse incomplete code snippets, 'ignore' should
+        be selected to silent any warning.
+        Default: raise (Raises an exception)
+
+    **kwargs : dict
+        Further config option that are specific to
+        the underlying AST parser. See code_tokenize
+        for more infos.
+
+    Returns
+    -------
+    ASTDiff
+        The smallest code change necessary
+        to convert the source code into the target code.
+    
+    """
     
     config     = load_from_lang_config(lang, **kwargs)
     source_ast = parse_ast(source, lang = lang, **kwargs)
@@ -56,6 +96,56 @@ def diff_search(source_ast, target_ast):
 # AST Difference --------------------------------------------------------
 
 class ASTDiff:
+    """
+    Difference between two code snippets
+
+    This object represents the smallest code change
+    necessary to transform a source code snippet
+    into a target code.
+
+    Attributes
+    ----------
+    is_single_statement : bool
+        Whether the code difference only affect a single program statement
+
+    source_ast : ASTNode
+        AST node related to the code change
+    
+    source_text : str
+        Source code which have to be changed
+
+    target_ast : ASTNode
+        AST node which is different to the source AST
+
+    target_text : str
+        Target text for converting source to target
+    
+    Methods
+    -------
+    edit_script : list[EditOp]
+        Computes a sequence of AST operations which need
+        to be performed to translate source code in target code
+        
+        Note: We balance performance and precision by computing
+        the AST edit script at the current diff level. The
+        algorithm runs the fastest on the smallest diff level
+        but is also most imprecise. To achieve the highest precision,
+        the root_diff should be used.
+
+    sstub_pattern : SStuBPattern
+        Categorizes the current diff into one of 20 SStuB categories.
+        Note: Currently, this operation is only supported for
+        Python code. Running the function on code in another language
+        will cause an exception.
+
+    statement_diff : ASTDiff
+        raises the AST difference to the statement level
+    
+    root_diff : ASTDiff
+        raises the AST difference to the root level (of each code snippet)
+
+    
+    """
 
     def __init__(self, config, source_ast, target_ast):
         self.config     = config
@@ -88,6 +178,8 @@ class ASTDiff:
         return ASTDiff(self.config, ast_root(self.source_ast), ast_root(self.target_ast))
 
     def sstub_pattern(self):
+        if self.config.lang != "python":
+            raise ValueError("SStuB can currently only be computed for Python code.")
         
         if (parent_statement(self.config.statement_types, self.source_ast) is None
                 or parent_statement(self.config.statement_types, self.target_ast) is None):

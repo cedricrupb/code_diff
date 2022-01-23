@@ -1,5 +1,4 @@
 from enum import Enum
-import re
 
 class SStubPattern(Enum):
 
@@ -62,7 +61,9 @@ def classify_sstub(source_ast, target_ast):
         if source_name == target_name:
             classifier_fns.append(same_function_mod)
 
-    if _query_path(source_ast, "if_statement", "condition") or _query_path(source_ast, "elif_clause", "condition"):
+    if (_query_path(source_ast, "if_statement", "condition")
+         or _query_path(source_ast, "elif_clause", "condition")
+         or _query_path(source_ast, "while_statement", "condition")):
         classifier_fns.append(change_if_statement)
 
     if source_ast.type in ["tuple", "list", "dictionary", "set"]:
@@ -119,15 +120,15 @@ def pisomorph(A, B):
 
 # Binary operand ----------------------------------------------------------------
 
-def _is_binary_operand(source_ast, target_ast):
-    return _query_path(source_ast, "binary_operator", "left") or _query_path(source_ast, "binary_operator", "right")
-
-def is_boolean_operand(source_ast, target_ast):
-    return _query_path(source_ast, "boolean_operator", "left") or _query_path(source_ast, "boolean_operator", "right")
-
 
 def is_binary_operand(source_ast, target_ast):
-    return _is_binary_operand(source_ast, target_ast) or is_boolean_operand(source_ast, target_ast)
+
+    for bin_op_type in ["binary_operator", "comparison_operator", "boolean_operator"]:
+        for direction in ["left", "right"]:
+            if (_query_path(source_ast, bin_op_type, direction, depth = 1)):
+                return True
+    
+    return False
 
 
 
@@ -218,16 +219,19 @@ def change_attribute_used(source_ast, target_ast):
 
 
 def change_identifier_used(source_ast, target_ast):
-    return source_ast.type == "identifier"
+
+    # Following ManySStuBs we ignore the following Method declaration, Class Declaration, Variable Declaration
+    if any(x in source_ast.parent.type for x in ["definition", "declaration"]):
+        return False
+
+    return source_ast.type == "identifier" and target_ast.type == "identifier"
 
 
 def change_binary_operator(source_ast, target_ast):
 
-    for operator in ["binary_operator", "boolean_operator", "comparison_operator"]:
-        if _query_path(source_ast, operator, "*", depth = 1):
-            if (not _query_path(source_ast, operator, "left", depth = 1) 
-                    and not _query_path(source_ast, operator, "right", depth = 1)):
-                return True
+    if source_ast.parent.type in ["binary_operator", "boolean_operator", "comparison_operator"]:
+        bin_op = source_ast.parent
+        return bin_op.children[1] == source_ast
 
     return False
 
@@ -332,12 +336,16 @@ def same_function_swap_args(source_ast, target_ast):
     if len(source_ast.children) != len(target_ast.children):
         return False
 
-    arguments = source_ast.children
-    for arg in arguments:
-        if not any(pisomorph(t, arg) for t in target_ast.children):
-            return False
+    src_arguments    = source_ast.children
+    target_arguments = target_ast.children
 
-    return True
+    diff_args = [i for i, src_arg in enumerate(src_arguments) if not pisomorph(src_arg, target_arguments[i])]
+
+    if len(diff_args) != 2: return False
+
+    swap_0, swap_1 = diff_args
+    return (pisomorph(src_arguments[swap_0], target_arguments[swap_1])
+             and pisomorph(src_arguments[swap_1], target_arguments[swap_0]))
 
 
 same_function_edits = {
@@ -364,11 +372,18 @@ def same_function_mod(source_ast, target_ast):
 
 
 def more_specific_if(source_ast, target_ast):
+    
+    if not target_ast.type == "boolean_operator": return False
+    if target_ast.children[1].type != "and"     : return False
+
     return any(pisomorph(c, source_ast) for c in target_ast.children)
 
 
 def less_specific_if(source_ast, target_ast):
-    return any(pisomorph(c, target_ast) for c in source_ast.children)
+    if not target_ast.type == "boolean_operator": return False
+    if target_ast.children[1].type != "or"      : return False
+
+    return any(pisomorph(c, source_ast) for c in target_ast.children)
 
 
 def change_if_statement(source_ast, target_ast):
@@ -413,7 +428,8 @@ def add_function_around_expression(source_ast, target_ast):
     if argument_list.type != "argument_list":
         return False
 
-    if len(argument_list.children) != 3: return False
+    # It seems that adding arguments together with a function seems to be okay (see PySStuBs dataset)
+    #if len(argument_list.children) != 3: return False 
 
     for arg in argument_list.children:
         if pisomorph(arg, source_ast):
