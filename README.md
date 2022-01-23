@@ -85,7 +85,7 @@ To decide whether your code can be handled by code.diff please review the librar
 
 
 ## Release history
-* 0.0.1
+* 0.1.0
     * Initial functionality
     * Documentation
     * SStuB Testing
