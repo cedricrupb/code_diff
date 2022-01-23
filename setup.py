@@ -17,7 +17,8 @@ setup(
   download_url = 'https://github.com/cedricrupb/code_diff/archive/refs/tags/v0.1.0.tar.gz', 
   keywords = ['code', 'differencing', 'AST', 'program', 'language processing'], 
   install_requires=[          
-          'code-tokenize'
+          'code-tokenize',
+          'apted'
       ],
   classifiers=[
     'Development Status :: 3 - Alpha',    
