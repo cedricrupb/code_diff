@@ -96,7 +96,7 @@ The goal of this project is to provide developer with easy access to AST-based c
 Feel free to open an issue if anything unexpected
 happens. 
 
-[Cedric Richter](https://uol.de/informatik/formale-methoden/team/cedric-richter) - [@cedricrupb](https://twitter.com/cedricrupb) - cedric.richter@uni-oldenburg.de
+[Cedric Richter](https://uol.de/informatik/formale-methoden/team/cedric-richter) - [@cedricrichter](https://twitter.com/cedrichter) - cedric.richter@uni-oldenburg.de
 
 Distributed under the MIT license. See ``LICENSE`` for more information.
 
