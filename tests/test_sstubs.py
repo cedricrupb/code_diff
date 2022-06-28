@@ -361,16 +361,22 @@ def test_same_function_swap_args_3():
     assert compute_diff_sstub(test) == SStubPattern.SAME_FUNCTION_SWAP_ARGS
 
 
+def bin_swaps(x):
+    for i in range(len(x) - 1):
+        for j in range(i + 1, len(x)):
+            result = list(x)
+            result[i], result[j] = result[j], result[i]
+            yield result
+
+
 def test_same_function_swap_args_auto():
-    import itertools
 
     args = ["a", "b", "c", "d + 1", "0 if a != 0 else 1"]
 
     for l in range(2, len(args)):
         perm = tuple(args[:l])
 
-        for p in itertools.permutations(perm):
-            if p == perm: continue
+        for p in bin_swaps(perm):
 
             test = """
 @@ -0,0 +0,0 @@ test
@@ -1008,6 +1014,8 @@ def test_change_binary_operand_4():
     
     assert compute_diff_sstub(test) == SStubPattern.CHANGE_BINARY_OPERAND
 
+
+
 # Change attribute used ----------------------------------------------------------------
 
 
@@ -1394,7 +1402,7 @@ def test_more_specific_if_4():
     
     """
     
-    assert compute_diff_sstub(test) == SStubPattern.MORE_SPECIFIC_IF
+    assert compute_diff_sstub(test) != SStubPattern.MORE_SPECIFIC_IF
 
 # Less specific if ------------------------------------------------------------------------
 
@@ -1402,8 +1410,8 @@ def test_less_specific_if_1():
     test = """
 @@ -0,0 +0,0 @@ test
     
-- if x and y:
-+ if x:
+- if x:
++ if x or y:
     pass
     
     """
@@ -1441,21 +1449,8 @@ def test_less_specific_if_4():
     test = """
 @@ -0,0 +0,0 @@ test
     
-- if x and test() or test2():
-+ if x and test():
-    pass
-    
-    """
-    
-    assert compute_diff_sstub(test) == SStubPattern.LESS_SPECIFIC_IF
-
-
-def test_less_specific_if_5():
-    test = """
-@@ -0,0 +0,0 @@ test
-    
-- if x and test() or test2():
-+ if x or test2():
+- if x and test():
++ if x and test() or test2():
     pass
     
     """
@@ -1513,4 +1508,4 @@ def test_real_world_3():
     
     """
 
-    assert compute_diff_sstub(test) == SStubPattern.MORE_SPECIFIC_IF
+    assert compute_diff_sstub(test) == SStubPattern.LESS_SPECIFIC_IF

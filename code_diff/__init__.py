@@ -1,4 +1,4 @@
-from code_tokenize.config import load_from_lang_config
+from code_tokenize.lang import load_from_lang_config
 from code_tokenize.tokens import match_type
 
 from .ast     import parse_ast
