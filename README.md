@@ -85,8 +85,9 @@ To decide whether your code can be handled by code.diff please review the librar
 
 
 ## Release history
-* 0.1.1
+* 0.1.2
     * Fix of the release information
+    * Fix bug in 0.1.1 release
     * Package now useable by installing from PyPI
 * 0.1.0
     * Initial functionality
