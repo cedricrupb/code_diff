@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools"] 
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code_diff"
+version = "v0.1.3"
+description = "Fast AST based code differencing in Python"
+readme = "README.md"
+requires-python = ">= 3.8"
+license = { file = "LICENSE.txt" }
+keywords = ["code", "differencing", "AST", "CST", "program", "language processing"]
+
+authors = [{name = "Cedric Richter", email = "cedricr.upb@gmail.com"}]
+maintainers = [{name = "Cedric Richter", email = "cedricr.upb@gmail.com"}]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",    
+    "Intended Audience :: Developers",  
+    "Topic :: Software Development :: Build Tools",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3", 
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+  ]
+
+dependencies = ["code_tokenize", "apted"]
+
+[project.urls]
+"Homepage" = "https://github.com/cedricrupb/code_diff"
+"Bug Reports" = "https://github.com/cedricrupb/code_diff/issues"
+"Source" = "https://github.com/cedricrupb/code_diff"

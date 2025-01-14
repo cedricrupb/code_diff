@@ -6,7 +6,7 @@ with open("README.md", "r") as f:
 setup(
   name = 'code_diff',
   packages = ['code_diff', 'code_diff.gumtree'], 
-  version = '0.1.2', 
+  version = '0.1.3', 
   license='MIT',     
   description = 'Fast AST based code differencing in Python',
   long_description = long_description,
@@ -14,10 +14,10 @@ setup(
   author = 'Cedric Richter',                   
   author_email = 'cedricr.upb@gmail.com',    
   url = 'https://github.com/cedricrupb/code_diff',  
-  download_url = 'https://github.com/cedricrupb/code_diff/archive/refs/tags/v0.1.2.tar.gz', 
+  download_url = 'https://github.com/cedricrupb/code_diff/archive/refs/tags/v0.1.3.tar.gz', 
   keywords = ['code', 'differencing', 'AST', 'program', 'language processing'], 
   install_requires=[          
-          'code-tokenize',
+          'code-tokenize>=0.2.1',
           'apted'
       ],
   classifiers=[
@@ -30,5 +30,9 @@ setup(
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
     'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
   ],
 )
