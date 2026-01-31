@@ -5,6 +5,11 @@ from .ast     import parse_ast
 from .utils   import cached_property
 from .sstubs  import SStubPattern, classify_sstub
 from .gumtree import compute_edit_script, EditScript, Update
+from .gumtree import diff_search_with_isomap, compute_isomap
+
+from .gumtree.ops import Insert, Move, Delete, Update
+
+from collections import namedtuple
 
 
 # Main method --------------------------------------------------------
@@ -200,14 +205,64 @@ class ASTDiff:
             return EditScript([Update(source_ast, target_ast.text)])
 
         # We need a common root to add to
-        while source_ast.type != target_ast.type: 
+        while True: 
             if source_ast.parent is None: break
             if target_ast.parent is None: break
 
             source_ast = source_ast.parent
             target_ast = target_ast.parent
+            if source_ast.type == target_ast.type: break
 
         return compute_edit_script(source_ast, target_ast)
+
+    def apply(self, other : str):
+        source_ast      = ast_root(self.source_ast)
+        other_ast_root  = parse_ast(other, lang = self.config.lang, 
+                                        syntax_error = self.config.syntax_error)
+        
+        source_ast, other_ast, src_to_oth = diff_search_with_isomap(source_ast, other_ast_root)
+        if source_ast is not None:
+            for src, oth in compute_isomap(source_ast, other_ast):
+                src_to_oth.add(src, oth)
+
+        # --- So far, mapping from src -> other ----
+    
+        inserted_nodes = {}
+        def _map_node(src_node):
+            if hasattr(src_node, "node_id") and src_node.node_id in inserted_nodes:
+                return inserted_nodes[src_node.node_id]
+            
+            if (src_node, None) not in src_to_oth:
+                raise ValueError(f"{src_node} has been deleted. Cannot perform the update.")
+
+            for _, oth_node in src_to_oth[(src_node, None)]:
+                return oth_node
+
+
+        for op in self.edit_script():
+            target_node = _map_node(op.target_node)
+
+            if isinstance(op, Move):
+                move_node = _map_node(op.node)
+                op.map(target_node, move_node).apply()
+
+            elif isinstance(op, Insert):
+                reverse_op = op.map(target_node).apply()
+                inserted_nodes[op.insert_id] = reverse_op.target_node
+
+            elif isinstance(op, Delete):
+                reverse_op = op.map(target_node).apply()
+                # Should we update the isomap here?
+            else:
+                op.map(target_node).apply()
+        
+
+        # Minimize the edit to be performed
+        old_other = parse_ast(other, lang = self.config.lang, 
+                               syntax_error = self.config.syntax_error)
+        
+        old_ast, new_ast = diff_search(old_other, other_ast_root)    
+        return _apply_ast_edits(other, old_ast, new_ast), ASTDiff(self.config, new_ast, old_ast)
 
     def __repr__(self):
         return "%s -> %s" % (self.source_text, self.target_text)
@@ -269,6 +324,52 @@ def tokenize_tree(ast):
     return " ".join(tokens)
 
 
+Position = namedtuple("Point", ["row", "column"])
+
+def _compute_offsets(text):
+    lines = text.splitlines(True)
+    if len(lines) == 1:
+        return 0, len(lines[0])
+    else:
+        return len(lines), len(lines[-1])
+
+def tree_to_code(ast):
+    tokens = []
+
+    if ast.text: tokens.append(ast.text)
+
+    last_element = None
+    for child in ast.children:
+        code_string = tree_to_code(child)
+        
+        if last_element and not child.position:
+            last_end    = last_element.position[1]
+            start = Position(last_end.row, last_end.column + 1)
+
+            row_offset, column_offset = _compute_offsets(code_string)
+            if row_offset == 0:
+                child.position = (start, 
+                                  Position(start.row, start.column + column_offset))
+            else:
+                child.position = (start, Position(start.row + row_offset, column_offset))
+
+        if last_element:
+            last_end    = last_element.position[1]
+
+            if child.position:
+                child_start = child.position[0]
+
+                if last_end.row == child_start.row:
+                    tokens.append(" "*(child_start.column - last_end.column))
+                else:
+                    tokens.append("\n"*(child_start.row - last_end.row) + " "*child_start.column)
+
+        tokens.append(code_string)
+        last_element = child
+
+    return "".join(tokens)
+
+
 
 def is_compatible_root(root_candidate, source_ast):
     return not equal_text(source_ast, root_candidate) and root_candidate.type != "block"
@@ -282,3 +383,44 @@ def equal_text(source_ast, parent_ast):
     if source_position[1][0] < parent_position[1][0]: return False
 
     return (source_position[0][1], source_position[1][1]) == (parent_position[0][1], parent_position[1][1])
+
+
+def _apply_edits(source_text, edits):
+    source_lines = source_text.splitlines(True)
+    
+    normed_edits = []
+    for position, text in edits:
+        position = (position[0].row, position[0].column, position[1].row, position[1].column)
+        normed_edits.append((position, text))
+
+    for (pos, text) in sorted(normed_edits)[::-1]:
+        if pos[0] == pos[2]:
+            source_lines[pos[0]] = source_lines[pos[0]][:pos[1]] + text + source_lines[pos[0]][pos[3]:]
+        else:
+            source_lines[pos[0]:pos[2]+1] = [source_lines[pos[0]][:pos[1]]] + [text] +  [source_lines[pos[2]][pos[3]:]]
+
+    return "".join(source_lines)
+
+
+def _apply_ast_edits(source_text, source_node, target_node):
+    if source_node is None or source_node.isomorph(target_node): return source_text
+
+    edits = []
+    queue = [(source_node, target_node)]
+    while len(queue) > 0:
+        source_node, target_node = queue.pop(0)
+
+        if len(source_node.children) != len(target_node.children):
+            edits.append((source_node.position, tree_to_code(target_node)))
+            continue
+
+        for i, source_child in enumerate(source_node.children):
+            target_child = target_node.children[i]
+
+            if not source_child.isomorph(target_child):
+                if source_child.position[0].row == source_child.position[1].row:
+                    edits.append((source_child.position, tree_to_code(target_child)))
+                else:
+                    queue.append((source_child, target_child))
+
+    return _apply_edits(source_text, edits)

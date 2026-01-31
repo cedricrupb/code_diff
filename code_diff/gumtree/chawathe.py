@@ -1,4 +1,5 @@
 import itertools
+import copy
 
 from .ops   import Update, Insert, Delete, Move
 from .utils import bfs_traversal, postorder_traversal
@@ -76,6 +77,8 @@ def compute_chawathe_edit_script(editmap, source, target):
     target.parent = target_parent
 
     return edit_script
+
+
 
 
 # Alignment ------------------------------------------------------------------

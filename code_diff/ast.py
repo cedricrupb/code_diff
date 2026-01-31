@@ -55,6 +55,31 @@ class ASTNode(object):
         self.subtree_height    = 1
         self.subtree_weight    = 1
 
+    def _update(self):
+        """Updates all tree based attributes based on the current state"""
+
+        # Subtree metrics
+        height = 1
+        weight = 1
+        hash_str = []
+
+        for child in self.children:
+            height       = max(child.subtree_height + 1, height)
+            weight      += child.subtree_weight
+            hash_str.append(str(child.subtree_hash))
+        
+        # WL hash subtree representation
+        base_str = self.type if self.text is None else self.text
+        hash_str.insert(0, base_str)
+        hash_str = "_".join(hash_str)
+        subtree_hash = hash(hash_str)
+
+        updated = (subtree_hash, height, weight) != (self.subtree_hash, self.subtree_height, self.subtree_weight)
+        self.subtree_hash, self.subtree_height, self.subtree_weight = subtree_hash, height, weight
+
+        if updated and self.parent: self.parent._update()
+        return
+
     def isomorph(self, other):
         return ((self.subtree_hash, self.type, self.subtree_height, self.subtree_weight) == 
                     (other.subtree_hash, other.type, other.subtree_height, other.subtree_weight))
@@ -75,6 +100,32 @@ class ASTNode(object):
             return name
 
         return "%s {\n%s\n}" % (name, " ".join(child_sexp))
+    
+    # Manipulation methods --------------------------------------
+
+    def update(self, text : str):
+        if text != self.text:
+            old_text = self.text
+            self.text = text
+            self._update()
+            return old_text
+
+        return self.text
+
+    def delete_child(self, position):
+        child = self.children[position]
+        child.parent = None
+        del self.children[position]
+        self._update()
+
+    def insert_child(self, child, position = -1):
+        if not child: return
+        self.children.insert(position, child)
+        child.parent = self
+        child._update()
+
+    # -----------------------------------------------------------
+
         
     def __iter__(self):
         def _self_bfs_search():
@@ -193,8 +244,6 @@ class TokensToAST:
                 self._create_node(current_node)
 
             self._open_root_if_not_complete(current_node)
-
-        print(self.root_node.sexp())
         
         return self.root_node
 

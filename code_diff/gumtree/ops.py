@@ -2,13 +2,29 @@ import json
 from dataclasses import dataclass
 from typing import Any, Tuple
 
+from ..ast import ASTNode
+
 @dataclass
 class EditOperation:
     target_node: Any
 
+    def map(self, new_target_node):
+        raise NotImplementedError()
+    
+    def apply(self):
+        raise NotImplementedError()
+        
+
 @dataclass
 class Update(EditOperation):
     value: Any
+
+    def map(self, new_target_node):
+        return Update(new_target_node, self.value)
+    
+    def apply(self):
+        old_text = self.target_node.update(self.value)
+        return Update(self.target_node, old_text)
 
 @dataclass
 class Insert(EditOperation):
@@ -16,14 +32,49 @@ class Insert(EditOperation):
     position: int
     insert_id: int # This is necessary to keep track of nodes (TODO: Better solution?)
 
+    def map(self, new_target_node):
+        return Insert(new_target_node, self.node, self.position, self.insert_id)
+    
+    def apply(self):
+        new_node = ASTNode(self.node[0], text = self.node[1])
+        self.target_node.insert_child(new_node, self.position)
+        return Delete(new_node)
+
+
 @dataclass
 class Move(EditOperation):
     node: Any
     position: int
 
+    def map(self, new_target_node, new_move_node = None):
+        return Move(new_target_node, new_move_node or self.node, self.position)
+    
+    def apply(self):
+        insert_node = self.node
+        reverse_insert = Delete(insert_node).apply()
+        self.target_node.insert_child(insert_node, self.position)
+        return Move(reverse_insert.target_node, 
+                    insert_node, reverse_insert.position)
+
+
 @dataclass
 class Delete(EditOperation):
-    pass
+    
+    def map(self, new_target_node):
+        return Delete(new_target_node)
+    
+    def apply(self):
+        if not self.target_node.parent: return
+        
+        parent = self.target_node.parent
+        for n, child in enumerate(parent.children):
+            if child == self.target_node: break
+        
+        parent.delete_child(n)
+        return Insert(parent, 
+                      (self.target_node.type, self.target_node.text),
+                      n, -1)
+
 
 # Edit script ----------------------------------------------------------------
 
@@ -31,6 +82,12 @@ class EditScript(list):
 
     def __init__(self, operations):
         super().__init__(operations)
+
+    def apply(self):
+        reverse_edits = []
+        for op in self: 
+            reverse_edits.append(op.apply())
+        return EditScript(reverse_edits[::-1])
 
     def __repr__(self):
         return serialize_script(self, indent = 2)
