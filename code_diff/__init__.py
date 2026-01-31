@@ -255,13 +255,13 @@ class ASTDiff:
                 # Should we update the isomap here?
             else:
                 op.map(target_node).apply()
-        
+
 
         # Minimize the edit to be performed
         old_other = parse_ast(other, lang = self.config.lang, 
                                syntax_error = self.config.syntax_error)
         
-        old_ast, new_ast = diff_search(old_other, other_ast_root)    
+        old_ast, new_ast = diff_search(old_other, other_ast_root)
         return _apply_ast_edits(other, old_ast, new_ast), ASTDiff(self.config, new_ast, old_ast)
 
     def __repr__(self):
@@ -410,7 +410,7 @@ def _apply_ast_edits(source_text, source_node, target_node):
     while len(queue) > 0:
         source_node, target_node = queue.pop(0)
 
-        if len(source_node.children) != len(target_node.children):
+        if not source_node.children or len(source_node.children) != len(target_node.children):
             edits.append((source_node.position, tree_to_code(target_node)))
             continue
 

@@ -68,6 +68,53 @@ output.edit_script()
 
 
 ```
+
+## Experimental: Applying the AST diff
+code.diff experimentally supports applying the code difference to a given target code. We apply edits approximately. Therefore, if the changed AST structure of the original source exists in the new target, the diff can still be applied. Example:
+```python
+import code_diff as cd
+
+# Python
+output = cd.difference(
+    '''
+        def my_func():
+            print("Hello World")
+    ''',
+    '''
+        def say_helloworld():
+            print("Hello World")
+    ''',
+lang = "python")
+
+# Output: my_func -> say_helloworld
+
+# Apply to new code
+NEW_TARGET = '''
+    def other_function():
+        return "other"
+
+    def my_func():
+        print("Hello World")
+
+    def my_func2():
+        print("Hello World from a friend")
+'''
+
+changed, reverse_diff = output.apply(NEW_TARGET)
+
+# Output: changed
+#    def other_function():
+#        return "other"
+#
+#    def say_helloworld():
+#        print("Hello World")
+#
+#    def my_func2():
+#        print("Hello World from a friend")
+
+```
+*NOTE:* Running apply is always costly as we have to compute an isomorphism mapping between the original source AST and the new target AST to apply the change. In addition, applying the diff can leave text artifacts (which the parser typically ignores). 
+
 ## Language support
 code.diff supports most programming languages
 where an AST can be computed. To parse an AST,
